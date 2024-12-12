@@ -1,14 +1,14 @@
 require_relative './helpers'
 
 class Day08
-  def self.off_map?(pos, rowlen, cols)
-    pos[0].negative? ||
-      pos[1].negative? ||
-      pos[0] >= cols ||
-      pos[1] >= rowlen - 1
+  def self.off_map?(loc, cols, rows)
+    loc[0].negative? ||
+      loc[1].negative? ||
+      loc[0] >= rows ||
+      loc[1] >= cols - 1
   end
 
-  def self.antinode(a, b, rowlen, cols, part_2 = false)
+  def self.antinode(a, b, cols, rows, part_2 = false)
     locs = []
     a = a.dup
     b = b.dup
@@ -19,7 +19,7 @@ class Day08
     return locs unless part_2
 
     locs << a.dup
-    until off_map?(a, rowlen, cols)
+    until off_map?(a, cols, rows)
       a[0] += dx
       a[1] += dy
       locs << a.dup
@@ -30,37 +30,37 @@ class Day08
 
   def self.parse(input)
     lines = input.lines
-    rowlen = lines.first.index("\n") + 1
+    cols = lines.first.index("\n") + 1
     antennae = {}
     input.scan(/([a-zA-Z0-9])/) do
       match = Regexp.last_match
       antennae[match[0]] = antennae[match[0]] || []
-      antennae[match[0]].push [match.begin(0) / rowlen, match.begin(0) % rowlen]
+      antennae[match[0]].push [match.begin(0) / cols, match.begin(0) % cols]
     end
-    [antennae, rowlen, lines.count]
+    [antennae, cols, lines.count]
   end
 
   def self.part_1(input)
-    antennae, rowlen, colnum = parse(input)
+    antennae, cols, rows = parse(input)
     n = []
     antennae.each_value do |locations|
       locations.combination(2) do |a, b|
-        n += antinode(a, b, rowlen, colnum)
-        n += antinode(b, a, rowlen, colnum)
+        n += antinode(a, b, cols, rows)
+        n += antinode(b, a, cols, rows)
       end
     end
-    n.reject { |a| off_map?(a, rowlen, colnum) }.uniq.count
+    n.reject { |a| off_map?(a, cols, rows) }.uniq.count
   end
 
   def self.part_2(input)
-    antennae, rowlen, colnum = parse(input)
+    antennae, cols, rows = parse(input)
     n = []
     antennae.each_value do |locations|
       locations.combination(2) do |a, b|
-        n += antinode(a, b, rowlen, colnum, true)
-        n += antinode(b, a, rowlen, colnum, true)
+        n += antinode(a, b, cols, rows, true)
+        n += antinode(b, a, cols, rows, true)
       end
     end
-    n.reject { |a| off_map?(a, rowlen, colnum) }.uniq.count
+    n.reject { |a| off_map?(a, cols, rows) }.uniq.count
   end
 end
