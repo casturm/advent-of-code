@@ -1,122 +1,115 @@
 class Day12
-  Grid = Struct.new(:input, :rows, :cols)
-
   def self.parse(input)
-    input = input.lines.map(&:strip)
-    rows = input.length
-    cols = input.first.length
-    Grid.new(input, rows, cols)
+    input.split("\n").map { |line| line.chars }
   end
 
-  def self.neighbors(i, j, grid)
+  def self.neighbors(i, j)
     [
-      as_plot(i + 1, j, grid),
-      as_plot(i - 1, j, grid),
-      as_plot(i, j + 1, grid),
-      as_plot(i, j - 1, grid)
+      [i + 1, j],
+      [i - 1, j],
+      [i, j + 1],
+      [i, j - 1]
     ]
   end
 
-  def self.as_plot(i, j, grid)
-    rows = grid.rows
-    cols = grid.cols
-    return if i.negative? || i >= rows || j.negative? || j >= cols
+  def self.walk_region(input, i, j, visited, region = {})
+    region[[i, j]] = true
+    neighbors(i, j).each do |n_i, n_j|
+      next if n_i.negative? ||
+              n_i >= input.length ||
+              n_j.negative? ||
+              n_j >= input.first.length ||
+              input[n_i][n_j] != input[i][j] ||
+              !visited[[n_i, n_j]].nil?
 
-    n = (i * cols) + j + 1
-    e = ((rows + 1) * cols) + ((j + 1) * rows) + i + 1
-    s = ((i + 1) * cols) + j + 1
-    w = ((rows + 1) * cols) + (j * rows) + i + 1
-
-    sides = [n, e, s, w]
-    plot = (cols * i) + j
-    type = grid.input[i][j]
-    [type, plot, sides]
-  end
-
-  def self.walk_region(i, j, grid, type, area, visited)
-    neighbors(i, j, grid).each do |neighbor|
-      next if neighbor.nil? || neighbor[0] != type || visited.include?(neighbor[1])
-
-      visited << neighbor[1]
-      area[0] << neighbor[1]
-      area[1] += neighbor[2]
-      walk_region(neighbor[1] / grid.rows, neighbor[1] % grid.cols, grid, type, area, visited)
+      visited[[n_i, n_j]] = true
+      walk_region(input, n_i, n_j, visited, region)
     end
+
+    region
   end
 
-  def self.walk(grid)
-    areas = []
-    rows = grid.rows
-    cols = grid.cols
-    visited = []
-    (0..(rows - 1)).each do |i|
-      (0..(cols - 1)).each do |j|
-        type, plot, sides = as_plot(i, j, grid)
+  def self.walk(input)
+    regions = []
+    visited = {}
+    input.each_with_index do |row, i|
+      row.each_with_index do |_col, j|
+        next unless visited[[i, j]].nil?
 
-        next if visited.include?(plot)
+        region = walk_region(input, i, j, visited)
 
-        area = [[plot], sides]
-        areas += [[type, area]]
-        visited << plot
-        walk_region(i, j, grid, type, area, visited)
+        regions << region
       end
     end
-    areas
+    regions
   end
 
-  def self.calculate_cost(areas)
-    costs = Hash.new(0)
-    areas.each do |type, area|
-      num_a = area[0].length
-      num_p = area[1].tally.select { |_p, n| n == 1 }
-      # puts "cost: #{type}: #{num_a} * #{num_p.length} = #{num_a * num_p.length}"
-      costs[[type, area[0]]] = num_a * num_p.length
-    end
+  def self.count_corners(region, loc)
+    up = region[[loc[0] - 1, loc[1]]]
+    down = region[[loc[0] + 1, loc[1]]]
+    left = region[[loc[0], loc[1] - 1]]
+    right = region[[loc[0], loc[1] + 1]]
+    up_left = region[[loc[0] - 1, loc[1] - 1]]
+    up_right = region[[loc[0] - 1, loc[1] + 1]]
+    down_left = region[[loc[0] + 1, loc[1] - 1]]
+    down_right = region[[loc[0] + 1, loc[1] + 1]]
 
-    costs.values.sum
+    count = 0
+
+    count += 1 if !up && !left
+    count += 1 if !down && !left
+    count += 1 if !up && !right
+    count += 1 if !down && !right
+
+    count += 1 if !up_left && up && left
+    count += 1 if !up_right && up && right
+    count += 1 if !down_left && down && left
+    count += 1 if !down_right && down && right
+
+    count
+  end
+
+  def self.calculate_cost(regions, _input)
+    regions.map do |region|
+      fences = region.map do |k, _v|
+        [
+          [k[0] + 1, k[1]],
+          [k[0] - 1, k[1]],
+          [k[0], k[1] + 1],
+          [k[0], k[1] - 1]
+        ].filter do |n|
+          region[n].nil?
+        end
+      end.flatten(1)
+
+      # puts "cost: #{region.keys.map { |i, j| input[i][j] }}"
+      perimeter = fences.length
+      area = region.keys.length
+      # puts "cost: #{fences} #{fences.length} * #{region.keys.length} = #{perimeter * area}"
+
+      reconstructed_fence = {}
+
+      fences.each { |f| reconstructed_fence[f] = true }
+
+      sides = 0
+      region.each do |f, _|
+        sides += count_corners(region, f)
+      end
+
+      [area * perimeter, area * sides]
+    end
   end
 
   def self.part_1(input)
-    # puts "#{input}"
-    grid = parse(input)
-    areas = walk(grid)
-    calculate_cost(areas)
-  end
-
-  def self.calculate_cost_2(areas, grid)
-    costs = Hash.new(0)
-    areas.each do |type, area|
-      num_a = area[0].length
-      perimeter = area[1].tally.select { |_p, n| n == 1 }.map { |p| p[0] }
-      n_s, e_w = perimeter.partition { |p| p > grid.rows * grid.cols }
-      n_s.sort!
-      e_w.sort!
-      # puts "#{n_s} #{e_w}"
-      sides = []
-      [[n_s, grid.rows], [e_w, grid.cols]].each do |a, edge|
-        sides << [a.shift]
-        until a.empty?
-          last_s = sides.last.last
-          if last_s + 1 == a.first && last_s % edge != 0
-            sides.last << a.first
-          else
-            sides << [a.first]
-          end
-          a.shift
-          puts "#{sides}"
-        end
-      end
-      num_s = sides.length
-      puts "cost: #{type}: #{num_a} * #{num_s} = #{num_a * num_s}"
-      costs[[type, area[0]]] = num_a * num_s
-    end
-
-    costs.values.sum
+    input = parse(input)
+    regions = walk(input)
+    # puts "regions: #{regions.map { |r| r.keys.map { |i, j| input[i][j] } }}"
+    calculate_cost(regions, input).map { |c| c[0] }.sum
   end
 
   def self.part_2(input)
-    grid = parse(input)
-    areas = walk(grid)
-    calculate_cost_2(areas, grid)
+    input = parse(input)
+    regions = walk(input)
+    calculate_cost(regions, input).map { |c| c[1] }.sum
   end
 end
