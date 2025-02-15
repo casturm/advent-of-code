@@ -3,3 +3,4 @@ inputs
 .vscode
 cache
 *.code-workspace
+.DS_Store
