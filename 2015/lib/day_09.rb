@@ -6,26 +6,25 @@ class Day09
   end
 
   def self.routes(input)
-    map = {}
-    locations = Set.new
+    distances = {}
+    cities = Set.new
 
-    input.lines.map do |line|
-      from, to, distance = line.match(/(\w+) to (\w+) = (\d+)/).captures
-      locations.add(from)
-      locations.add(to)
-      map["#{from} to #{to}"] = distance.to_i
-      map["#{to} to #{from}"] = distance.to_i
+    input.lines.each do |line|
+      parts = line.strip.split(' ')
+      city1, city2, distance = parts[0], parts[2], parts[4].to_i
+
+      distances[[city1, city2]] = distance
+      distances[[city2, city1]] = distance
+      cities << city1
+      cities << city2
     end
 
-    routes = locations.to_a.permutation.map do |route|
-      total_distance = (1...route.size).sum { |i| map["#{route[i - 1]} to #{route[i]}"] }
-      [route, total_distance]
+    cities.to_a.permutation.map do |route|
+      route.each_cons(2).sum { |a, b| distances[[a, b]] }
     end
-
-    routes.map(&:last)
   end
 
   def self.part_2(input)
-  routes(input).max
+    routes(input).max
   end
 end
