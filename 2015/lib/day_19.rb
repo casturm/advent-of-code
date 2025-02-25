@@ -32,14 +32,13 @@ class Day19
 
     steps = 0
     while molecule != 'e'
-      found = false
-
-      reverse_replacements.each do |to, from|
+      found = reverse_replacements.find do |to, from|
         if molecule.include?(to)
           molecule.sub!(to, from)
           steps += 1
-          found = true
-          break
+          true
+        else
+          false
         end
       end
 
