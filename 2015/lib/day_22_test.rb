@@ -18,7 +18,9 @@ class Day22Test < Minitest::Test
   end
 
   def test_part_1
-    answer = Day22.solve(@input)
+    # answer = Day22.solve(@input)
+    game = WizardBattle.new(50, 500, 55, 8)
+    answer = game.find_least_mana_win
     puts "Part 1: #{answer}"
 
     submit_answer(22, answer, 1)

@@ -93,3 +93,130 @@ class Day22
     [match[1].to_i, match[2].to_i]
   end
 end
+
+
+require 'set'
+
+class GameState
+  attr_accessor :player_hp, :boss_hp, :mana, :shield_timer, :poison_timer, :recharge_timer, :mana_spent, :player_armor
+
+  def initialize(player_hp, boss_hp, mana, shield_timer = 0, poison_timer = 0, recharge_timer = 0, mana_spent = 0, player_armor = 0)
+    @player_hp = player_hp
+    @boss_hp = boss_hp
+    @mana = mana
+    @shield_timer = shield_timer
+    @poison_timer = poison_timer
+    @recharge_timer = recharge_timer
+    @mana_spent = mana_spent
+    @player_armor = player_armor
+  end
+
+  def apply_effects
+    # Apply Poison
+    @boss_hp -= 3 if @poison_timer > 0
+    @poison_timer -= 1 if @poison_timer > 0
+
+    # Apply Recharge
+    @mana += 101 if @recharge_timer > 0
+    @recharge_timer -= 1 if @recharge_timer > 0
+
+    # Apply Shield
+    if @shield_timer > 0
+      @player_armor = 7
+      @shield_timer -= 1
+    else
+      @player_armor = 0
+    end
+  end
+
+  def boss_attack(boss_damage)
+    damage = [boss_damage - @player_armor, 1].max
+    @player_hp -= damage
+  end
+
+  def clone_with_changes(changes)
+    GameState.new(
+      changes.fetch(:player_hp, @player_hp),
+      changes.fetch(:boss_hp, @boss_hp),
+      changes.fetch(:mana, @mana),
+      changes.fetch(:shield_timer, @shield_timer),
+      changes.fetch(:poison_timer, @poison_timer),
+      changes.fetch(:recharge_timer, @recharge_timer),
+      changes.fetch(:mana_spent, @mana_spent),
+      changes.fetch(:player_armor, @player_armor)
+    )
+  end
+
+  def game_over?
+    @player_hp <= 0 || @boss_hp <= 0
+  end
+end
+
+class WizardBattle
+  SPELLS = {
+    'Magic Missile' => { cost: 53, damage: 4, heal: 0, shield: 0, poison: 0, recharge: 0 },
+    'Drain'         => { cost: 73, damage: 2, heal: 2, shield: 0, poison: 0, recharge: 0 },
+    'Shield'        => { cost: 113, damage: 0, heal: 0, shield: 6, poison: 0, recharge: 0 },
+    'Poison'        => { cost: 173, damage: 0, heal: 0, shield: 0, poison: 6, recharge: 0 },
+    'Recharge'      => { cost: 229, damage: 0, heal: 0, shield: 0, poison: 0, recharge: 5 }
+  }
+
+  def initialize(player_hp, player_mana, boss_hp, boss_damage)
+    @initial_state = GameState.new(player_hp, boss_hp, player_mana)
+    @boss_damage = boss_damage
+  end
+
+  def find_least_mana_win
+    queue = [@initial_state]
+    visited = Set.new
+
+    until queue.empty?
+      state = queue.shift # Priority queue (Dijkstra-like search)
+
+      return state.mana_spent if state.boss_hp <= 0 # Win condition
+
+      # Skip if already visited this exact game state
+      next if visited.include?([state.player_hp, state.boss_hp, state.mana, state.shield_timer, state.poison_timer, state.recharge_timer])
+      visited.add([state.player_hp, state.boss_hp, state.mana, state.shield_timer, state.poison_timer, state.recharge_timer])
+
+      state.apply_effects
+      next if state.boss_hp <= 0 # Boss defeated after effects
+
+      SPELLS.each do |spell, effects|
+        next if state.mana < effects[:cost] # Not enough mana
+        next if effects[:shield] > 0 && state.shield_timer > 0 # Shield already active
+        next if effects[:poison] > 0 && state.poison_timer > 0 # Poison already active
+        next if effects[:recharge] > 0 && state.recharge_timer > 0 # Recharge already active
+
+        new_state = state.clone_with_changes(
+          player_hp: state.player_hp + effects[:heal],
+          boss_hp: state.boss_hp - effects[:damage],
+          mana: state.mana - effects[:cost],
+          shield_timer: effects[:shield] > 0 ? effects[:shield] : state.shield_timer,
+          poison_timer: effects[:poison] > 0 ? effects[:poison] : state.poison_timer,
+          recharge_timer: effects[:recharge] > 0 ? effects[:recharge] : state.recharge_timer,
+          mana_spent: state.mana_spent + effects[:cost]
+        )
+
+        new_state.apply_effects
+        next if new_state.boss_hp <= 0 # Boss defeated
+
+        new_state.boss_attack(@boss_damage)
+        queue << new_state unless new_state.game_over?
+      end
+
+      queue.sort_by!(&:mana_spent) # Sort by lowest mana spent (Dijkstra-like priority queue)
+    end
+
+    Float::INFINITY # No solution found
+  end
+end
+
+# Example usage:
+# player_hp = 50
+# player_mana = 500
+# boss_hp = 58
+# boss_damage = 9
+#
+# game = WizardBattle.new(player_hp, player_mana, boss_hp, boss_damage)
+# puts "Least mana required to win: #{game.find_least_mana_win}"
